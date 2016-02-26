@@ -1,0 +1,241 @@
+---
+title: 'MIE237'
+author: "Neil Montgomery"
+date: "2016-02-26"
+output: 
+  ioslides_presentation: 
+    css: 'styles.css' 
+    widescreen: true 
+    transition: 0.001
+---
+\newcommand{\Var}[1]{\text{Var}\left( #1 \right)}
+\newcommand{\E}[1]{E\left( #1 \right)}
+\newcommand{\Sample}[1]{#1_1,\ldots,#1_n}
+\newcommand{\od}[2]{\overline #1_{#2\cdot}}
+\newcommand{\flist}[2]{\{#1_1, #1_2, \ldots, #1_#2\}}
+\newcommand{\samp}[2]{#1_1, #1_2, \ldots, #1_#2}
+\renewcommand{\bar}[1]{\overline{#1}}
+\newcommand{\ve}{\varepsilon}
+\newcommand{\bs}[1]{\boldsymbol{#1}}
+
+
+
+```{r, echo=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+## $R^2$ 
+
+The "fit" of a linear model can be summarized by a single number (!):
+
+$$\begin{align*}
+SST &= SSR + SSE \\
+1 &= \frac{SSR}{SST} + \frac{SSE}{SST}\\
+R^2 &= \frac{SSR}{SST}\end{align*}$$
+
+This is a moderately useful number that also goes by a unfortunately dramatic-sounding "coefficient of determination" and can be interpreted as "the proportion of variation explained by the model". 
+
+But in the end it is just a single number that summarizes an *entire bivariate linear relationship*, so don't take it too seriously. 
+
+## Examples
+
+```{r, message=FALSE, fig.height = 3, fig.width = 3}
+library(dplyr)
+library(ggplot2)
+set.seed(2)
+n <- 40
+x <- seq(1, 10, length.out = n)
+y1 <-  1 + x + rnorm(n, 0, 0.1)
+
+data.frame(x, y1) %>% 
+  ggplot(aes(x=x, y=y1)) + geom_point() + 
+  ggtitle(substitute(paste(R^2, " = ", R2), list(R2 = round(cor(x, y1)^2, 3))))
+
+y2 <- 1 - x + rnorm(n, 0, 1)
+data.frame(x, y2) %>% 
+  ggplot(aes(x=x, y=y2)) + geom_point() + 
+  ggtitle(substitute(paste(R^2, " = ", R2), list(R2 = round(cor(x, y2)^2, 3))))
+
+y3 <- 1 + x + rnorm(n, 0, 5)
+data.frame(x, y3) %>% 
+  ggplot(aes(x=x, y=y3)) + geom_point() + 
+  ggtitle(substitute(paste(R^2, " = ", R2), list(R2 = round(cor(x, y3)^2, 3))))
+
+```
+
+## Limitations: "Model assumptions"
+
+Assumes linear model is appropriate to begin with.
+
+```{r, fig.height = 4, fig.width = 4}
+set.seed(5)
+y4 <- 1 + x + rnorm(n, 0, 2)
+data.frame(x, y4) %>% 
+  ggplot(aes(x=x, y=y4)) + geom_point() + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  ggtitle(substitute(paste(R^2, " = ", R2), list(R2 = round(cor(x, y4)^2, 3))))
+
+y5 <- 20 - (x - 8)^2 + rnorm(n, 0, 8)
+data.frame(x, y5) %>% 
+  ggplot(aes(x=x, y=y5)) + geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x + I(x^2), se = FALSE) +
+  ggtitle(substitute(paste(R^2, " = ", R2), list(R2 = round(cor(x, y5)^2, 3))))
+```
+
+## Limitations: sample size/variability
+
+Both simulated datasets are from the ***same underlying model*** 
+
+(happens to be $y_i = 1 + 1 \cdot x_i + \varepsilon$ with $\varepsilon \sim N(0, 4)$)
+
+```{r, fig.height = 4, fig.width = 4}
+set.seed(42)
+y6 <- 1 + x + rnorm(n, 0, 2)
+data.frame(x, y6) %>% 
+  ggplot(aes(x=x, y=y6)) + geom_point() + 
+  ggtitle(substitute(paste(R^2, " = ", R2), list(R2 = round(cor(x, y6)^2, 3))))
+
+x2 <- seq(1, 10, length.out = 2*n)
+y7 <- 1 + x2 + rnorm(2*n, 0, 2)
+data.frame(x2, y7) %>% 
+  ggplot(aes(x=x2, y=y7)) + geom_point() +
+  ggtitle(substitute(paste(R^2, " = ", R2), list(R2 = round(cor(x2, y7)^2, 3))))
+```
+
+## New topic: estimating the mean response { .build }
+
+Suppose you want to estimate the mean "response" at some new $x_0$ (may
+or may not be one of the original $x$'s.) Let's call this number $E(Y(x_0))$.
+
+(Book calls this number $\mu_{Y|x_0}$.)
+
+The *true value* for the mean response is:
+$$\beta_0 + \beta_1 x_0$$
+
+What's the obvious best guess?
+$$\hat\beta_0 + \hat\beta_1 x_0$$
+
+We can make a confidence interval in the "usual manner". 
+
+## Confidence interval for the mean response { .build }
+
+"As usual" will be based on:
+$$\frac{(\hat\beta_0 + \hat\beta_1 x_0) - (\beta_0 + \beta_1 x_0)}{SE(\hat\beta_0 + \hat\beta_1 x_0)} \sim \quad ???$$
+where SE means "standard error".
+
+In what follows keep in mind: $y_i$, $\hat\beta_0$ and $\hat\beta_1$ are *random* while the $x_i$ are *fixed*.
+
+$$\begin{align*}
+\Var{\hat\beta_0 + \hat\beta_1 x_0} &= \Var{\bar y - \hat\beta_1\bar x + \hat\beta_1 x_0}\\
+&= \Var{\bar y + \hat\beta_1(x_0 - \bar x)}\\
+&= \frac{\sigma^2}{n} + \frac{\sigma^2}{S_{xx}}(x_0 - \bar x)^2 + \text{Cov}(\bar y, \hat\beta_1)
+\end{align*}$$
+
+## CI for the mean response
+
+It turns out $\text{Cov}(\bar y, \hat\beta_1) = 0$. *(Book sez "see ex. 11.61" but the question is just "prove it!" with no suggestion on how to proceed!)*
+
+So we end up with:
+$$\Var{\hat\beta_0 + \hat\beta_1 x_0} = \sigma^2\left(\frac{1}{n} + \frac{(x_0 - \bar x)^2}{S_{xx}}\right)$$
+
+Conclusion: 
+$$\frac{(\hat\beta_0 + \hat\beta_1 x_0) - (\beta_0 + \beta_1 x_0)}{s\sqrt{\left(\frac{1}{n} + \frac{(x_0 - \bar x)^2}{S_{xx}}\right)}} \sim \quad ???$$
+
+## Example 
+
+I'll use the last simulated example from above (`x2` versus `y7`)
+
+
+```{r, fig.width=6, fig.height=4, fig.align='center'}
+data.frame(x2, y7) %>% 
+  ggplot(aes(x=x2, y=y7)) + geom_point() 
+```
+
+Let's find confidence intervals for the mean response at $x_0 = 5.0$.
+
+## Example
+
+```{r}
+library(broom)
+library(knitr)
+ci <- tidy(lm(y7~x2))
+x_0 = 5.0
+kable(ci, digits=3)
+options(digits=3)
+s <- glance(lm(y7 ~ x2))$sigma
+x_bar <- mean(x2)
+S_xx <- sum((x2 - mean(x2))^2)
+```
+
+Also:
+
+$$\begin{align*}
+s = \sqrt{\text{MSE}} &= `r s`\\
+\bar x &= `r x_bar`\\
+S_{xx} &= `r S_xx`
+\end{align*}$$
+
+The 95% confidence interval is:
+$$`r ci$estimate[1]` + `r ci$estimate[2]` \cdot `r x_0` \pm t_{n-2, 0.025} `r s`
+\sqrt{\frac{1}{`r length(x2)`} + \frac{(`r x_0` - `r x_bar`)^2}{`r S_xx`}}
+= `r ci$estimate[1] + ci$estimate[2] * x_0` \pm 
+`r qt(0.975, 78)*s*sqrt(1/length(x2) + (x_0 -  x_bar)^2/S_xx)`$$
+
+## graphic of pointwise CIs across range of x
+
+```{r, fig.width=10, fig.height=5,fig.align='center'}
+data.frame(x2, y7) %>% 
+  ggplot(aes(x=x2, y=y7)) + geom_point() + stat_smooth(method="lm")
+```
+
+## New topic (technically!) predicting a new response { .build }
+
+Suppose you want to predict the ``response'' at some new $x_0$ (may
+or may not be one of the original $x$'s.) Let's call this $Y(x_0)$. 
+
+Important: $Y(x_0)$ is a *random variable*. 
+
+The true value $Y(x_0)$ isn't known, except it is normal with  
+mean $\beta_0+\beta_1x_0$ and variance $\sigma^2$.
+
+The obvious best guess is $\hat Y(x_0) = \hat\beta_0 + \hat\beta_1 x_0$.
+
+(Danger Zone: same *guess* as for $E(Y(x_0))$. But this is a fundamentally different problem.)
+
+## Prediction interval (PI) for new response
+
+"As usual" based on:
+$$\frac{\hat Y(x_0) - Y(x_0)}{SE\left(\hat Y(x_0) - Y(x_0)\right)} \sim \quad ???$$
+
+Proceed somewhat like before, but actually easier:
+$$\begin{align*}
+\Var{\hat Y(x_0) - Y(x_0)} &= \Var{\hat Y(x_0)} + \Var{Y(x_0)}\\
+&=\sigma^2\left(\frac{1}{n} + \frac{(x_0-\overline x)^2}{S_{xx}}\right)
++{\sigma^2}\\
+&=\sigma^2\left(1+\frac{1}{n} + \frac{(x_0-\overline x)^2}{S_{xx}}\right)
+\end{align*}$$
+
+## Prediction interval (PI) for new response
+
+Conclusion: 
+$$\frac{\hat Y(x_0) - Y(x_0)}{s\sqrt{1 + \left(\frac{1}{n} + \frac{(x_0 - \bar x)^2}{S_{xx}}\right)}} \sim \quad ???$$
+
+## Example
+
+From the previous example, the 95% PI for $Y(5.0)$ is:
+
+$$`r ci$estimate[1]` + `r ci$estimate[2]` \cdot `r x_0` \pm t_{n-2, 0.025} `r s`
+\sqrt{1 + \frac{1}{`r length(x2)`} + \frac{(`r x_0` - `r x_bar`)^2}{`r S_xx`}}
+= `r ci$estimate[1] + ci$estimate[2] * x_0` \pm 
+`r qt(0.975, 78)*s*sqrt(1 + 1/length(x2) + (x_0 -  x_bar)^2/S_xx)`$$
+
+## graphic of pointwise PIs across range of x
+
+```{r, fig.width=10, fig.height=5,fig.align='center'}
+preds <- predict(lm(y7~x2), newdata = data.frame(x2=x2), interval = "p")
+cbind(data.frame(x2, y7), preds) %>% 
+  ggplot(aes(x=x2, y=y7)) + 
+  geom_point() + 
+  geom_ribbon(aes(ymin=lwr, ymax=upr), alpha=0.1)+
+  geom_line(aes(y=fit))
+```
